@@ -122,7 +122,7 @@ main(int argc, char **argv)
 #endif
 
     if (annotation_str)
-	AnnoteImage(image, annotation_str);
+	AnnotateImage(image, annotation_str);
 
 #if 0
     cvShowImage("Sensity", image);

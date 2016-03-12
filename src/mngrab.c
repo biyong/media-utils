@@ -274,7 +274,7 @@ generate_image_with_annotation(AVCodecContext *ctx, AVFrame *frame, int format, 
 #endif
 
     if (annotation)
-	AnnoteImage(image, annotation);
+	AnnotateImage(image, annotation);
 
 #if 0
     cvShowImage("Sensity", image);

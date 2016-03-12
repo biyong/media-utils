@@ -9,7 +9,7 @@
 
 #define d_printf(fmt, args...)    if (debug) fprintf(stderr, fmt, ## args)
 
-static int debug = 0;
+static int debug = 1;
 
 static int
 annotation_get_op(json_object *obj, int *op) 
@@ -20,17 +20,60 @@ annotation_get_op(json_object *obj, int *op)
 }
 
 static int
-annotation_get_roi(json_object *obj, double *roi) 
+annotation_get_point(json_object *obj, Point *p) 
+{
+    json_object_object_foreach(obj, key, val) {
+	switch (key[0]) {
+	    case 'x':
+		p->x = json_object_get_double(val);
+		break;
+
+	    case 'y':
+		p->y = json_object_get_double(val);
+		break;
+    
+	    default:
+		break;
+	}
+    }
+    
+    return 0;
+}
+
+static int
+annotation_get_roi(json_object *obj, Annotation *a) 
+{
+    json_object *item;
+    int i, count;
+    Point *p;
+
+    count = json_object_array_length(obj);
+    a->roi = (Point *)malloc(count*sizeof(Point));
+    if (a->roi == NULL)
+	return -1;
+
+    for (i = 0, p = a->roi; i < count; i++, p++) {
+	item = json_object_array_get_idx(obj, i);
+	annotation_get_point(item, p);
+    }
+    a->np = count;
+    
+    return 0;
+}
+
+static int
+annotation_get_phi(json_object *obj, double *phi) 
 {
     json_object *item;
     int i, count;
 
     count = json_object_array_length(obj);
-    if (count > 4)
-	count = 4;
+
+    if (count > 3)
+	count = 3;
     for (i = 0; i < count; i++) {
 	item = json_object_array_get_idx(obj, i);
-	roi[i] = json_object_get_double(item);
+	phi[i] = json_object_get_double(item);
     }
 
     return 0;
@@ -132,8 +175,12 @@ parse_annotation(json_object *obj, Annotation *annotation)
 		op_seen = 1;
 		break;
 		
+	    case 'p':
+		annotation_get_phi(val, annotation->phi);
+		break;
+
 	    case 'r':
-		annotation_get_roi(val, annotation->roi);
+		annotation_get_roi(val, annotation);
 		break;
 
 	    case 's':
@@ -291,9 +338,7 @@ DrawText(CvMat *mat, Annotation *a)
     CvMat src_mat, *dst_mat;
     int base_line = 0;
     CvSize text_size;
-#if 0
-    char window[64];
-#endif
+
 
     cvInitFont(&font, CV_FONT_HERSHEY_PLAIN, a->scale, a->scale, 0, a->bold, CV_AA);
     cvGetTextSize(a->label, &font, &text_size, &base_line);
@@ -302,7 +347,7 @@ DrawText(CvMat *mat, Annotation *a)
      * Draw it on src image directly if there is no alpha blend or background color applied
      */
     if (a->argb[0] == 255 && a->fill[0] == 0) {
-	cvPutText(mat, a->label, cvPoint(a->roi[0], a->roi[1] + text_size.height + base_line), &font,
+	cvPutText(mat, a->label, cvPoint(a->roi[0].x, a->roi[0].y + text_size.height + base_line), &font,
 		  CV_RGB(a->argb[1], a->argb[2], a->argb[3]));
 	return 0;
     }
@@ -310,8 +355,8 @@ DrawText(CvMat *mat, Annotation *a)
     /*
      * Get dimension of the ROI
      */
-    roi.x = a->roi[0];
-    roi.y = a->roi[1];
+    roi.x = a->roi[0].x;
+    roi.y = a->roi[0].y;
     roi.width = text_size.width;
     roi.height = text_size.height + 2*base_line;
     if (roi.x + roi.width > mat->cols)
@@ -326,49 +371,45 @@ DrawText(CvMat *mat, Annotation *a)
 
 #if 0
     printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
-    sprintf(window, "src_%d", i);
-    cvShowImage(window, &src_mat);
+    cvShowImage("src", &src_mat);
     cvWaitKey(0);
 #endif
 
     /*
      * Create target image
      */
-    dst_mat = cvCreateMat(roi.height, roi.width, CV_8UC3);
-    if (!a->fill[0])
-	cvZero(dst_mat);
-    else
+    dst_mat = cvCloneMat(&src_mat);
+    if (a->fill[0]) {
+	/*
+	 * Alpha belend background first
+	 */
 	cvSet(dst_mat, CV_RGB(a->fill[1], a->fill[2], a->fill[3]), NULL);
-    if (a->argb[0] != 255)
-	cvPutText(dst_mat, a->label, cvPoint(0, text_size.height + base_line), &font,
-		  CV_RGB(a->argb[1], a->argb[2], a->argb[3]));
+	alpha = (double)a->fill[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+    }
 
 #if 0
-    sprintf(window, "dst_%d", i);
-    cvShowImage(window, dst_mat);
+    cvShowImage("src_bg", &src_mat);
     cvWaitKey(0);
 #endif
 
     /*
-     * Alpha belend 
+     * Draw and alpha belend foreground objects
      */
-    if (a->fill[0]) {
-	alpha = (double)(a->argb[0] > a->fill[0] ? a->fill[0] : a->argb[0]) / 255;
-	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
-    } else {
+    if (a->argb[0] != 255) {
+	cvCopy(&src_mat, dst_mat, NULL);
+	cvPutText(dst_mat, a->label, cvPoint(0, text_size.height + base_line), &font,
+		  CV_RGB(a->argb[1], a->argb[2], a->argb[3]));
 	alpha = (double)a->argb[0] / 255;
-	cvAddWeighted(&src_mat, 1, dst_mat, alpha, 0.0, &src_mat);
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+	cvReleaseMat(&dst_mat);
+    } else {
+	cvPutText(mat, a->label, cvPoint(a->roi[0].x, a->roi[0].y + text_size.height + base_line), &font,
+		  CV_RGB(a->argb[1], a->argb[2], a->argb[3]));
     }
 
-    cvReleaseMat(&dst_mat);
-
-    if (a->argb[0] == 255)
-	cvPutText(mat, a->label, cvPoint(a->roi[0], a->roi[1] + text_size.height + base_line), &font,
-		  CV_RGB(a->argb[1], a->argb[2], a->argb[3]));
-
 #if 0
-    sprintf(window, "alpha_%d", i);
-    cvShowImage(window, &src_mat);
+    cvShowImage("src_bg_fg", &src_mat);
     cvWaitKey(0);
 #endif
 
@@ -382,33 +423,30 @@ DrawRectangle(CvMat *mat, Annotation *a)
     double alpha = 0;
     CvRect roi;
     CvMat src_mat, *dst_mat;
-#if 0
-    char window[64];
-#endif
 
     /*
      * Check anchor point
      */
-    if (a->roi[2] <= a->roi[0] || a->roi[3] <= a->roi[1])
+    if (a->roi[1].x < a->roi[0].x || a->roi[1].y < a->roi[0].y)
 	return -1;
 
     /*
      * Draw it on src image directly if there is no alpha blend or background color applied
      */
     if (a->argb[0] == 255 && a->fill[0] == 0) {
-	cvRectangle(mat, cvPoint(a->roi[0], a->roi[1]), cvPoint(a->roi[2], a->roi[3]), 
+	cvRectangle(mat, cvPoint(a->roi[0].x + a->bold/2, a->roi[0].y + a->bold/2),
+		    cvPoint(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2), 
 		    CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
-
 	return 0;
     }
 
     /*
      * Get dimension of the ROI
      */
-    roi.x = a->roi[0] - a->bold/2;
-    roi.y = a->roi[1] - a->bold/2;
-    roi.width = a->roi[2] - a->roi[0] + a->bold;
-    roi.height = a->roi[3] - a->roi[1] + a->bold;
+    roi.x = a->roi[0].x;
+    roi.y = a->roi[0].y;
+    roi.width = a->roi[1].x - a->roi[0].x;
+    roi.height = a->roi[1].y - a->roi[0].y;
     if (roi.x + roi.width > mat->cols)
 	roi.width -= roi.x +roi.width - mat->cols;
     if (roi.y + roi.height > mat->rows)
@@ -421,50 +459,296 @@ DrawRectangle(CvMat *mat, Annotation *a)
 
 #if 0
     printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
-    sprintf(window, "src_%d", i);
-    cvShowImage(window, &src_mat);
+    cvShowImage("src", &src_mat);
     cvWaitKey(0);
 #endif
 
     /*
      * Create target image
      */
-    dst_mat = cvCreateMat(roi.height, roi.width, CV_8UC3);
-    if (!a->fill[0])
-	cvZero(dst_mat);
-    else
+    dst_mat = cvCloneMat(&src_mat);
+    if (a->fill[0]) {
+	/*
+	 * Alpha belend background first
+	 */
 	cvSet(dst_mat, CV_RGB(a->fill[1], a->fill[2], a->fill[3]), NULL);
-    
-    if (a->argb[0] != 255)
-	cvRectangle(dst_mat, cvPoint(a->bold/2, a->bold/2), cvPoint(a->roi[2] - a->roi[0], a->roi[3] - a->roi[1]), 
-		    CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+	alpha = (double)a->fill[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+    }
 
 #if 0
-    sprintf(window, "dst_%d", i);
-    cvShowImage(window, dst_mat);
+    cvShowImage("src_bg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Draw and alpha belend foreground objects
+     */
+    if (a->argb[0] != 255) {
+	cvCopy(&src_mat, dst_mat, NULL);
+	cvRectangle(dst_mat, cvPoint(a->bold/2, a->bold/2),
+		    cvPoint(a->roi[1].x - a->roi[0].x - a->bold/2, a->roi[1].y - a->roi[0].y - a->bold/2), 
+		    CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+	alpha = (double)a->argb[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+	cvReleaseMat(&dst_mat);
+    } else {
+	cvRectangle(mat, cvPoint(a->roi[0].x + a->bold/2, a->roi[0].y + a->bold/2),
+		    cvPoint(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2), 
+		    CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+    }
+
+#if 0
+    cvShowImage("alpha_0", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    return 0;
+}
+
+
+static int
+DrawLine(CvMat *mat, Annotation *a)
+{
+    double alpha = 0;
+    CvRect roi;
+    CvMat src_mat, *dst_mat;
+
+
+    /*
+     * Check anchor point
+     */
+    if (a->roi[1].x < a->roi[0].x || a->roi[1].y < a->roi[0].y)
+	return -1;
+
+    /*
+     * Draw it on src image directly if there is no alpha blend
+     */
+    if (a->argb[0] == 255) {
+	cvLine(mat, cvPoint(a->roi[0].x + a->bold/2, a->roi[0].y + a->bold/2),
+	       cvPoint(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2), 
+	       CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+
+	return 0;
+    }
+
+    /*
+     * Get dimension of the ROI
+     */
+    roi.x = a->roi[0].x;
+    roi.y = a->roi[0].y;
+    roi.width = a->roi[1].x - a->roi[0].x;
+    roi.height = a->roi[1].y - a->roi[0].y;
+    if (roi.x + roi.width > mat->cols)
+	roi.width -= roi.x +roi.width - mat->cols;
+    if (roi.y + roi.height > mat->rows)
+	roi.width -= roi.y +roi.height - mat->rows;
+
+    /*
+     * Create source image
+     */
+    cvGetSubRect(mat, &src_mat, roi);
+
+#if 0
+    printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
+    cvShowImage("src", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Create target image
+     */
+    dst_mat = cvCloneMat(&src_mat);
+    if (a->argb[0] != 255)
+	cvLine(dst_mat, cvPoint(a->bold/2, a->bold/2), 
+	       cvPoint(a->roi[1].x - a->roi[0].x -a->bold/2, a->roi[1].y - a->roi[0].y - a->bold/2), 
+	       CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+
+#if 0
+    cvShowImage("dst", dst_mat);
     cvWaitKey(0);
 #endif
 
     /*
      * Alpha belend 
      */
-    if (a->fill[0]) {
-	alpha = (double)(a->argb[0] > a->fill[0] ? a->fill[0] : a->argb[0]) / 255;
-	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
-    } else {
-	alpha = (double)a->argb[0] / 255;
-	cvAddWeighted(&src_mat, 1, dst_mat, alpha, 0.0, &src_mat);
-    }
-
+    alpha = (double)a->argb[0] / 255;
+    cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
     cvReleaseMat(&dst_mat);
 
-    if (a->argb[0] == 255)
-	cvRectangle(mat, cvPoint(a->roi[0], a->roi[1]), cvPoint(a->roi[2], a->roi[3]), 
-		    CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+#if 0
+    cvShowImage("src_fg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    return 0;
+}
+
+
+static int
+DrawEllipse(CvMat *mat, Annotation *a)
+{
+    double alpha = 0;
+    CvRect roi;
+    CvMat src_mat, *dst_mat;
+
+    /*
+     * Check axes
+     */
+    if (a->roi[1].x <= 0 || a->roi[1].y <= 0)
+	return -1;
+
+    /*
+     * Draw it on src image directly if there is no alpha blend or background color applied
+     */
+    if (a->argb[0] == 255 && a->fill[0] == 0) {
+	cvEllipse(mat, cvPoint(a->roi[0].x, a->roi[0].y), cvSize(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2),
+		  a->phi[0], 0, 360, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+
+	return 0;
+    }
+
+    /*
+     * Get dimension of the ROI
+     */
+    roi.x = 0;
+    roi.y = 0;
+    roi.width = mat->cols;
+    roi.height = mat->rows;
+
+    /*
+     * Create source image
+     */
+    cvGetSubRect(mat, &src_mat, roi);
 
 #if 0
-    sprintf(window, "alpha_%d", i);
-    cvShowImage(window, &src_mat);
+    printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
+    cvShowImage("src", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Create target image
+     */
+    dst_mat = cvCloneMat(mat);
+    if (a->fill[0]) {
+	/*
+	 * Alpha belend background first
+	 */
+	cvEllipse(dst_mat, cvPoint(a->roi[0].x, a->roi[0].y), cvSize(a->roi[1].x, a->roi[1].y),
+		  a->phi[0], 0, 360, CV_RGB(a->fill[1], a->fill[2], a->fill[3]), CV_FILLED, CV_AA, 0);
+	alpha = (double)a->fill[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+    }
+
+#if 0
+    cvShowImage("src_bg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Draw and alpha belend foreground objects
+     */
+    if (a->argb[0] != 255) {
+	cvCopy(&src_mat, dst_mat, NULL);
+	cvEllipse(dst_mat, cvPoint(a->roi[0].x, a->roi[0].y), cvSize(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2),
+		  a->phi[0], 0, 360, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+	alpha = (double)a->argb[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+	cvReleaseMat(&dst_mat);
+    } else {
+	cvEllipse(mat, cvPoint(a->roi[0].x, a->roi[0].y), cvSize(a->roi[1].x - a->bold/2, a->roi[1].y - a->bold/2),
+		  a->phi[0], 0, 360, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+    }
+
+#if 0
+    cvShowImage("src_bg_fg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    return 0;
+}
+
+
+static int
+DrawCircle(CvMat *mat, Annotation *a)
+{
+    double alpha = 0;
+    CvRect roi;
+    CvMat src_mat, *dst_mat;
+
+
+    /*
+     * Check radius
+     */
+    if (a->roi[1].x - a->roi[0].x <= 0)
+	return -1;
+
+    /*
+     * Draw it on src image directly if there is no alpha blend or background color applied
+     */
+    if (a->argb[0] == 255 && a->fill[0] == 0) {
+	cvCircle(mat, cvPoint(a->roi[0].x, a->roi[0].y), (int)(a->roi[1].x - a->roi[0].x - a->bold/2),
+		 CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+
+	return 0;
+    }
+
+    /*
+     * Get dimension of the ROI
+     */
+    roi.x = 0;
+    roi.y = 0;
+    roi.width = mat->cols;
+    roi.height = mat->rows;
+
+    /*
+     * Create source image
+     */
+    cvGetSubRect(mat, &src_mat, roi);
+
+#if 0
+    printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
+    cvShowImage("src", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Create target image
+     */
+    dst_mat = cvCloneMat(mat);
+    if (a->fill[0]) {
+	/*
+	 * Alpha belend background first
+	 */
+	cvCircle(dst_mat, cvPoint(a->roi[0].x, a->roi[0].y), (int)(a->roi[1].x - a->roi[0].x),
+		 CV_RGB(a->fill[1], a->fill[2], a->fill[3]), CV_FILLED, CV_AA, 0);
+	alpha = (double)a->fill[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+    }
+
+#if 0
+    cvShowImage("src_bg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Draw and alpha belend foreground objects
+     */
+    if (a->argb[0] != 255) {
+	cvCopy(&src_mat, dst_mat, NULL);
+	cvCircle(dst_mat, cvPoint(a->roi[0].x, a->roi[0].y), (int)(a->roi[1].x - a->roi[0].x - a->bold/2),
+		 CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+	alpha = (double)a->argb[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+	cvReleaseMat(&dst_mat);
+    } else {
+	cvCircle(mat, cvPoint(a->roi[0].x, a->roi[0].y), (int)(a->roi[1].x - a->roi[0].x - a->bold/2),
+		 CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+    }
+
+#if 0
+    cvShowImage("src_bg_fg", &src_mat);
     cvWaitKey(0);
 #endif
 
@@ -473,7 +757,7 @@ DrawRectangle(CvMat *mat, Annotation *a)
 
 
 int
-AnnoteImage(CvMat *mat, char *commands)
+AnnotateImage(CvMat *mat, char *commands)
 {
     int i, n;
     json_object *jobj, *obj;
@@ -505,26 +789,16 @@ AnnoteImage(CvMat *mat, char *commands)
 	obj = json_object_array_get_idx(annotations, i);
 	if (!parse_annotation(obj, &a)) {
 	    /*
-	     * Covert relative coordinates to pixel coordinates if needed
+	     * Covert relative coordinates to pixel coordinates
 	     */
-	    if (a.roi[0] < 1 && a.roi[1] < 1 && a.roi[2] < 1 && a.roi[3] < 1) {
-		a.roi[0] *= mat->cols;
-		a.roi[1] *= mat->rows;
-		a.roi[2] *= mat->cols;
-		a.roi[3] *= mat->rows;
+	    for (n = 0; n < a.np; n++) {
+		a.roi[n].x *= mat->cols;
+		a.roi[n].y *= mat->rows;
+		if (a.roi[n].x < 0) a.roi[n].x = 0;
+		if (a.roi[n].x > mat->cols) a.roi[n].x = mat->cols;
+		if (a.roi[n].y < 0) a.roi[n].y = 0;
+		if (a.roi[n].y > mat->rows) a.roi[n].y = mat->rows;
 	    }
-
-	    /*
-	     * Check the anchor points
-	     */
-	    if (a.roi[0] < 0) a.roi[0] = 0;
-	    if (a.roi[0] > mat->cols) a.roi[0] = mat->cols;
-	    if (a.roi[1] < 0) a.roi[1] = 0;
-	    if (a.roi[1] > mat->rows) a.roi[1] = mat->rows;
-	    if (a.roi[2] < 0) a.roi[2] = 0;
-	    if (a.roi[2] > mat->cols) a.roi[2] = mat->cols;
-	    if (a.roi[3] < 0) a.roi[3] = 0;
-	    if (a.roi[3] > mat->rows) a.roi[3] = mat->rows;
 
 	    /*
 	     * Clamp the color
@@ -537,7 +811,7 @@ AnnoteImage(CvMat *mat, char *commands)
 	    }
 
 	    d_printf("##### op      = %d\n", a.op);
-	    d_printf("##### roi     = [ %lf, %lf, %lf, %lf ]\n", a.roi[0], a.roi[1], a.roi[2], a.roi[3]);
+	    d_printf("##### roi     = [ (%lf, %lf), (%lf, %lf) ]\n", a.roi[0].x, a.roi[0].y, a.roi[1].x, a.roi[1].y);
 	    d_printf("##### argb    = [ %d, %d, %d, %d ]\n", a.argb[0], a.argb[1], a.argb[2], a.argb[3]);
 	    d_printf("##### fill    = [ %d, %d, %d, %d ]\n", a.fill[0], a.fill[1], a.fill[2], a.fill[3]);
 	    d_printf("##### label   = %s\n", a.label);
@@ -546,7 +820,7 @@ AnnoteImage(CvMat *mat, char *commands)
 	    d_printf("\n");
 
 	    switch (a.op) {
-		case OL_TEXT:
+		case OL_LABEL:
 		    DrawText(mat, &a);
 		    break;
 
@@ -554,9 +828,28 @@ AnnoteImage(CvMat *mat, char *commands)
 		    DrawRectangle(mat, &a);
 		    break;
 
+		case OL_LINE:
+		    DrawLine(mat, &a);
+		    break;
+
+		case OL_ELLIPSE:
+		    DrawEllipse(mat, &a);
+		    break;
+
+		case OL_CIRCLE:
+		    DrawCircle(mat, &a);
+		    break;
+
+		case OL_POLYGON:
+//		    DrawPolygon(mat, &a);
+		    break;
+
 		default:
 		    break;
 	    }
+
+	    if (a.roi)
+		free(a.roi);
 	}
     }
 
