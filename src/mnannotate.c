@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "mnannotate.h"
 
+
 #define d_printf(fmt, args...)    if (debug) fprintf(stderr, fmt, ## args)
 
 static int debug = 1;
@@ -671,6 +672,92 @@ DrawEllipse(CvMat *mat, Annotation *a)
 
 
 static int
+DrawPolygon(CvMat *mat, Annotation *a)
+{
+    int i;
+    double alpha = 0;
+    CvRect roi;
+    CvMat src_mat, *dst_mat;
+    CvPoint *pts;
+
+
+    pts = (CvPoint *)malloc(a->np*sizeof(CvPoint));
+    if (!pts) 
+	return -1;
+
+    for (i = 0; i < a->np; i++) {
+	pts[i] = cvPoint(a->roi[i].x, a->roi[i].y);
+    }
+
+    /*
+     * Draw it on src image directly if there is no alpha blend or background color applied
+     */
+    if (a->argb[0] == 255 && a->fill[0] == 0) {
+	cvPolyLine(mat, &pts, &a->np, 1, 1, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+
+	return 0;
+    }
+
+    /*
+     * Get dimension of the ROI
+     */
+    roi.x = 0;
+    roi.y = 0;
+    roi.width = mat->cols;
+    roi.height = mat->rows;
+
+    /*
+     * Create source image
+     */
+    cvGetSubRect(mat, &src_mat, roi);
+
+#if 0
+    printf("##### subrect width = %d, subrec height = %d\n", src_mat.cols, src_mat.rows);
+    cvShowImage("src", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Create target image
+     */
+    dst_mat = cvCloneMat(mat);
+    if (a->fill[0]) {
+	/*
+	 * Alpha belend background first
+	 */
+	cvFillPoly(dst_mat, &pts, &a->np, 1, CV_RGB(a->fill[1], a->fill[2], a->fill[3]), CV_AA, 0);
+	alpha = (double)a->fill[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+    }
+
+#if 0
+    cvShowImage("src_bg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    /*
+     * Draw and alpha belend foreground objects
+     */
+    if (a->argb[0] != 255) {
+	cvCopy(&src_mat, dst_mat, NULL);
+	cvPolyLine(dst_mat, &pts, &a->np, 1, 1, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+	alpha = (double)a->argb[0] / 255;
+	cvAddWeighted(&src_mat, 1 - alpha, dst_mat, alpha, 0.0, &src_mat);
+	cvReleaseMat(&dst_mat);
+    } else {
+	cvPolyLine(mat, &pts, &a->np, 1, 1, CV_RGB(a->argb[1], a->argb[2], a->argb[3]), a->bold, CV_AA, 0);
+    }
+
+#if 0
+    cvShowImage("src_bg_fg", &src_mat);
+    cvWaitKey(0);
+#endif
+
+    return 0;
+}
+
+
+static int
 DrawCircle(CvMat *mat, Annotation *a)
 {
     double alpha = 0;
@@ -810,8 +897,10 @@ AnnotateImage(CvMat *mat, char *commands)
 		a.fill[n] = (a.fill[n] > 255)? 255 : a.fill[n];
 	    }
 
+	    d_printf("\n");
 	    d_printf("##### op      = %d\n", a.op);
 	    d_printf("##### roi     = [ (%lf, %lf), (%lf, %lf) ]\n", a.roi[0].x, a.roi[0].y, a.roi[1].x, a.roi[1].y);
+	    d_printf("##### phi     = [ %lf, %lf, %lf ]\n", a.phi[0], a.phi[1], a.phi[2]);
 	    d_printf("##### argb    = [ %d, %d, %d, %d ]\n", a.argb[0], a.argb[1], a.argb[2], a.argb[3]);
 	    d_printf("##### fill    = [ %d, %d, %d, %d ]\n", a.fill[0], a.fill[1], a.fill[2], a.fill[3]);
 	    d_printf("##### label   = %s\n", a.label);
@@ -841,7 +930,7 @@ AnnotateImage(CvMat *mat, char *commands)
 		    break;
 
 		case OL_POLYGON:
-//		    DrawPolygon(mat, &a);
+		    DrawPolygon(mat, &a);
 		    break;
 
 		default:
