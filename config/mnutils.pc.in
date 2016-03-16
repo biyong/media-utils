@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+sharedlibdir=@sharedlibdir@
+includedir=@includedir@
+
+Name: media-utils
+Description: Media utility library for medianode application
+Version: @VERSION@
+
+Requires: opencv, json-c
+Libs: -L${libdir} -lmnutils
+Cflags: -I${includedir}/mnutils

@@ -45,7 +45,7 @@ AC_SUBST(JSON_CFLAGS)
 AC_SUBST(JSON_LIBS)
 
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile config/mnutils.pc])
 AC_OUTPUT
 
 
