@@ -29,12 +29,12 @@ print_usage(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage: mndraw [OPTION]... [FILE]\n");
     fprintf(stderr, "Draw graph annotation on an image file.\n");
-    fprintf(stderr, "  -d	turn on debug message\n");
+    fprintf(stderr, "  -d       turn on debug message\n");
     fprintf(stderr, "  -f       pixel format (yuv420|yuv422|nv12) for raw image input file)\n");
-    fprintf(stderr, "  -o	output image file\n");
-    fprintf(stderr, "  -s	dimension of the raw image input file\n");
+    fprintf(stderr, "  -o       output image file\n");
+    fprintf(stderr, "  -s       dimension of the raw image input file\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Examples:  cat annotation.jason | mndraw -f yuv420 -s 1280x720 cam0_H_yuv420p.raw -o cam0_H_yuv420p.jpg\n");
+    fprintf(stderr, "Examples:  cat annotation.json | mndraw -f yuv420 -s 1280x720 cam0_H_yuv420p.raw -o cam0_H_yuv420p.jpg\n");
     fprintf(stderr, "\n");
 }
 

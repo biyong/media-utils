@@ -415,7 +415,7 @@ print_usage(void)
     fprintf(stderr, "  -a	performe image annotation based on the JSON annotation request\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Examples:  mngrab -t 2000 -n 5 -i png -p camera_1H mnrecord_1H.mnf\n");
-    fprintf(stderr, "           cat annotation.jason | mngrab -t 2000 -n 5 -i png -p camera_1H mnrecord_1H.mnf\n");
+    fprintf(stderr, "           cat annotation.json | mngrab -t 2000 -n 5 -i png -p camera_1H mnrecord_1H.mnf\n");
     fprintf(stderr, "\n");
 }
 
