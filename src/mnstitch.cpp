@@ -3,8 +3,7 @@
 
 using namespace std;
 
-#include "opencv2/opencv_modules.hpp"
-#include "opencv2/stitching/stitcher.hpp"
+#include "opencv2/stitching.hpp"
 #include "opencv2/stitching/detail/autocalib.hpp"
 #include "opencv2/stitching/detail/blenders.hpp"
 #include "opencv2/stitching/detail/exposure_compensate.hpp"
@@ -13,7 +12,7 @@ using namespace std;
 #include "opencv2/stitching/detail/util.hpp"
 #include "opencv2/stitching/detail/warpers.hpp"
 #include "opencv2/stitching/warpers.hpp"
-#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/highgui.hpp"
 #include "opencv2/calib3d.hpp"
 
 using namespace cv;
