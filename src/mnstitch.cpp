@@ -80,8 +80,8 @@ registerImages(const vector<detail::ImageFeatures>& features, vector<detail::Cam
     detail::BestOf2NearestMatcher matcher(false, match_conf);
     detail::BundleAdjusterRay adjuster;
     adjuster.setConfThresh(conf_thresh);
-    //uchar refine_mask_data[] = {1, 1, 1, 0, 1, 1, 0, 0, 0};
-    uchar refine_mask_data[] = {1, 1, 1, 0, 1, 0, 0, 0, 0};
+    uchar refine_mask_data[] = {1, 1, 1, 0, 1, 1, 0, 0, 0};
+    //uchar refine_mask_data[] = {1, 1, 1, 0, 1, 0, 0, 0, 0};
     Mat refine_mask(3, 3, CV_8U, refine_mask_data);
 
     // feature matching
@@ -99,10 +99,10 @@ registerImages(const vector<detail::ImageFeatures>& features, vector<detail::Cam
 
 #if 1 // hardcodes with camera parameters from preliminary imx274 camera clibration result
 	std::cout << "##### camera matrix[" << i << "] from estimator: " << cameras[i].K() << std::endl;
-	cameras[i].focal = 1317.52;
+	cameras[i].focal = 1242.6;
 	cameras[i].aspect = 1;
-	cameras[i].ppx = 1437;
-	cameras[i].ppy = 729;
+	cameras[i].ppx = 1449;
+	cameras[i].ppy = 795;
 	cout << "+++++ focal = " << cameras[i].focal << endl;
 	cout << "+++++ aspect = " << cameras[i].aspect << endl;
 	cout << "+++++ ppx = " << cameras[i].ppx << endl;
