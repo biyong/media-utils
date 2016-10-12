@@ -147,6 +147,11 @@ main(int argc, char* argv[])
 	Rect crop = rectWithinMask(resultMask);
 	cout << "Cropping with aspect ratio ..." << endl;
 	Rect cropRatio = AspectRectWithinMask(resultMask, ASPECT_RATIO, TARGET_WIDTH, TARGET_HEIGHT);
+	if (cropRatio.width != TARGET_WIDTH || cropRatio.height != TARGET_HEIGHT) {
+	    cout << "Failed to generate stitched frame with desired dimension." << endl;
+	    return -1;
+	}
+
 	rectangle(result, crop, Scalar(0, 0, 255), 2);
 	rectangle(result, cropRatio, Scalar(0, 255, 0), 2);
 
