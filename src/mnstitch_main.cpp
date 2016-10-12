@@ -171,8 +171,8 @@ main(int argc, char* argv[])
 	    // write Mat to file
 	    ofstream map_file(stitching_map.c_str(), std::ios::out | std::ios::binary);
 	    if (map_file.is_open()) {
-		int width = scaled_dim_x * 2;
-		int height = scaled_dim_y;
+		int width = scaled_dim_x > 0 ? scaled_dim_x * 2 : dim_x * 2;
+		int height = scaled_dim_y > 0 ? scaled_dim_y : dim_y;
 		int type = stitchingMap.type();
 		int n;
 
