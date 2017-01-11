@@ -18,7 +18,7 @@ int parseCmdArgs(int argc, char** argv);
 vector<string> img_names;
 string result_name = "result.jpg";
 string stitching_map = "";
-bool rgba = false;
+bool i420 = false;
 bool mapgen = false;
 int scaled_dim_x = 0;
 int scaled_dim_y = 0;
@@ -30,15 +30,15 @@ int dim_y = 0;
 #define TARGET_HEIGHT	1080
 
 Mat
-load_rgba_image(char *filename, int width, int height, int scaled_width, int scaled_height)
+load_i420_image(char *filename, int width, int height, int scaled_width, int scaled_height)
 {
     Mat img, converted;
     FILE *fp = NULL;
     char *imagedata = NULL;
-    int n, framesize = width * height * 4;
+    int n, framesize = width * height * 3 / 2;
 
     if (!width || !height) {
-	cout << "Failed to load RGBA image, invalid dimension size." << endl;
+	cout << "Failed to load I420 image, invalid dimension size." << endl;
 	return img;
     }
 
@@ -52,23 +52,23 @@ load_rgba_image(char *filename, int width, int height, int scaled_width, int sca
 
     n = fread(imagedata, 1, framesize, fp);
     if (n != framesize) {
-	cout << "Failed to load RGBA image, invalid file size." << endl;
+	cout << "Failed to load I420 image, invalid file size." << endl;
 	return img;
     }
 
-    img = Mat(cvSize(width, height), CV_8UC4, imagedata, Mat::AUTO_STEP);
+    img = Mat(cvSize(width, height * 3 / 2), CV_8UC1, imagedata, Mat::AUTO_STEP);
     converted = Mat(cvSize(width, height), CV_8UC3);
-    cvtColor(img, converted, CV_RGBA2BGR);
+    cvtColor(img, converted, CV_YUV2BGR_IYUV, 3);
 
     if (scaled_width > 0 && scaled_width < width && 
 	scaled_height > 0 && scaled_height < height) {
 	Mat resized_img;
 
-	cout << "RGBA image " << filename << " is loaded with scaling ... " << endl;
+	cout << "I420 image " << filename << " is loaded with scaling ... " << endl;
 	resize(converted, resized_img, Size(scaled_width, scaled_height));
 	return resized_img;
     } else {
-	cout << "RGBA image " << filename << " is loaded without scaling ... " << endl;
+	cout << "I420 image " << filename << " is loaded without scaling ... " << endl;
 	scaled_width = width;
 	scaled_height = height;
 	return converted;
@@ -102,7 +102,7 @@ main(int argc, char* argv[])
     num_images = 2;
     vector<Mat> source_images(num_images);
     for (int i = 0; i < num_images; i++) {
-	source_images[i] = load_rgba_image((char *)img_names[i].c_str(), dim_x, dim_y, scaled_dim_x, scaled_dim_y);
+	source_images[i] = load_i420_image((char *)img_names[i].c_str(), dim_x, dim_y, scaled_dim_x, scaled_dim_y);
 	if (source_images[i].empty()) {
 	    cout << "Can't open source image " << img_names[i] <<endl;
 	    return -1;
@@ -269,7 +269,7 @@ int parseCmdArgs(int argc, char** argv)
         } else if (string(argv[i]) == "--mapgen") {
 	    mapgen = true;
         } else if (string(argv[i]) == "--raw") {
-	    rgba = true;
+	    i420 = true;
         } else if (string(argv[i]) == "--dim") {
 	    sscanf(argv[i + 1], "%dx%d", &dim_x, &dim_y);
             i++;
