@@ -25,7 +25,7 @@ using namespace cv;
 
 
 double seam_megapix = 1.0;
-float conf_thresh = 1.0f;
+float conf_thresh = 0.5f;
 float match_conf = 0.3f;
 detail::WaveCorrectKind wave_correct = detail::WAVE_CORRECT_HORIZ;
 float blend_strength = 5;
@@ -99,9 +99,9 @@ registerImages(const vector<detail::ImageFeatures>& features, vector<detail::Cam
 
 #if 1 // hardcodes with camera parameters from preliminary imx274 camera clibration result
 	std::cout << "##### camera matrix[" << i << "] from estimator: " << cameras[i].K() << std::endl;
-	cameras[i].focal = 1242.6;
+	cameras[i].focal = 1317.52
 	cameras[i].aspect = 1;
-	cameras[i].ppx = 1449;
+	cameras[i].ppx = 1410;
 	cameras[i].ppy = 795;
 	cout << "+++++ focal = " << cameras[i].focal << endl;
 	cout << "+++++ aspect = " << cameras[i].aspect << endl;
