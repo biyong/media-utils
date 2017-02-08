@@ -99,7 +99,7 @@ registerImages(const vector<detail::ImageFeatures>& features, vector<detail::Cam
 
 #if 1 // hardcodes with camera parameters from preliminary imx274 camera clibration result
 	std::cout << "##### camera matrix[" << i << "] from estimator: " << cameras[i].K() << std::endl;
-	cameras[i].focal = 1317.52
+	cameras[i].focal = 1317.52;
 	cameras[i].aspect = 1;
 	cameras[i].ppx = 1410;
 	cameras[i].ppy = 795;
