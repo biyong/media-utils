@@ -200,6 +200,9 @@ main(int argc, char* argv[])
 	findFeatures(images, features);
 	time.find_features = (getTickCount() - t) / getTickFrequency();
 
+	if (seam_megapix > 0)
+		seam_scale = min(1.0, sqrt(seam_megapix * 1e6 / source_images[0].size().area()));
+
 	for (int i = 0; i < num_images; i++)
 		resize(source_images[i], images[i], Size(), seam_scale, seam_scale);
 

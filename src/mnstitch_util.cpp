@@ -111,7 +111,7 @@ Rect rectWithinMask (Mat& mask) {
 		width = xMax - x;
 		height = yMax - y;
 
-#if 0
+#ifdef DEBUG
 		cout << "xMin   = " << x << endl;
 		cout << "yMin   = " << y << endl;
 		cout << "xMax   = " << xMax << endl;
@@ -136,7 +136,7 @@ Rect rectWithinMask (Mat& mask) {
 		float minYDeficit = (float)(width-minYCount) / (float)width;
 		float maxYDeficit = (float)(width-maxYCount) / (float)width;
 
-#if 0
+#ifdef DEBUG
 		cout << "minXDeficit = " << minXDeficit << endl;
 		cout << "maxXDeficit = " << maxXDeficit << endl;
 		cout << "minYDeficit = " << minYDeficit << endl;
