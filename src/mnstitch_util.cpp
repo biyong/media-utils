@@ -248,7 +248,7 @@ Rect aspectRectWithinMask (Mat& mask, double outRatio, int cropped_width, int cr
 		width = xMax - x;
 		height = yMax - y;
 
-#if 0
+#if DEBUG
 		cout << "xMin   = " << x << endl;
 		cout << "yMin   = " << y << endl;
 		cout << "xMax   = " << xMax << endl;

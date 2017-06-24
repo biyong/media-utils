@@ -43,7 +43,7 @@ using namespace cv;
 
 
 
-# if 0
+#if 0
 string
 type2str(int type) {
 	string r;
