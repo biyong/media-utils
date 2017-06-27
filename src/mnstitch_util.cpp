@@ -111,7 +111,7 @@ Rect rectWithinMask (Mat& mask) {
 		width = xMax - x;
 		height = yMax - y;
 
-#ifdef DEBUG
+#ifdef DEBUG_TRACE
 		cout << "xMin   = " << x << endl;
 		cout << "yMin   = " << y << endl;
 		cout << "xMax   = " << xMax << endl;
@@ -136,7 +136,7 @@ Rect rectWithinMask (Mat& mask) {
 		float minYDeficit = (float)(width-minYCount) / (float)width;
 		float maxYDeficit = (float)(width-maxYCount) / (float)width;
 
-#ifdef DEBUG
+#ifdef DEBUG_TRACE
 		cout << "minXDeficit = " << minXDeficit << endl;
 		cout << "maxXDeficit = " << maxXDeficit << endl;
 		cout << "minYDeficit = " << minYDeficit << endl;
@@ -248,7 +248,7 @@ Rect aspectRectWithinMask (Mat& mask, double outRatio, int cropped_width, int cr
 		width = xMax - x;
 		height = yMax - y;
 
-#if DEBUG
+#ifdef DEBUG_TRACE
 		cout << "xMin   = " << x << endl;
 		cout << "yMin   = " << y << endl;
 		cout << "xMax   = " << xMax << endl;
