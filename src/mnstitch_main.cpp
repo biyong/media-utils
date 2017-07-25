@@ -30,6 +30,8 @@ double compose_megapix = -1;
 float conf_thresh = 0.7f;
 float match_conf = 0.54f;
 
+#define MNSTITCH_CONF	"/mfgdata/apps/mediaserver/mnstitch.conf"
+
 #define ASPECT_RATIO	(32.0/9.0)
 #define TARGET_WIDTH	3840
 #define TARGET_HEIGHT	1080
@@ -148,6 +150,27 @@ main(int argc, char* argv[])
 	//
 	if (parseOptions(argc, argv))
 		exit(1);
+
+	//
+	// Load config file (if there is one)
+	//
+	ifstream ifs(MNSTITCH_CONF);
+	for (string line; getline(ifs, line); ) {
+		char entry[32];
+		double value;
+		sscanf(line.c_str(), "%s%lf", entry, &value);
+		if (string(entry) == "work_megapix")
+			work_megapix = min(1.0, value);
+		else if (string(entry) == "seam_megapix")
+			seam_megapix = min(1.0, value);
+		else if (string(entry) == "compose_megapix")
+			compose_megapix = min(1.0, value);
+		else if (string(entry) == "conf_thresh")
+			conf_thresh = (float)min(1.0, value);
+		else if (string(entry) == "match_conf")
+			match_conf = (float)min(1.0, value);
+	}
+	ifs.close();
 
 	//
 	// Check if have enough images
